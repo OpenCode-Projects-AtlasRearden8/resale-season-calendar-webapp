@@ -1,0 +1,10 @@
+{
+  "name": "resale-season-calendar-webapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline month-level buy-low/sell-high resale season calendar. Single-file HTML/JS/CSS, zero dependencies.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node tests/window-logic.test.js"
+  }
+}

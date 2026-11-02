@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Resale Season Calendar — Buy Low, Sell High</title>
+<style>
+  :root {
+    --bg: #faf7f2;
+    --surface: #ffffff;
+    --ink: #24323f;
+    --muted: #64748b;
+    --line: #e5e0d8;
+    --buy: #0d9488;
+    --buy-soft: #ccfbf1;
+    --sell: #d97706;
+    --sell-soft: #fef3c7;
+    --both: #7c3aed;
+    --both-soft: #ede9fe;
+    --off: #cbd5e1;
+    --accent: #0f766e;
+    --warn: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.5;
+  }
+  header {
+    padding: 28px 20px 10px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 { margin: 0 0 4px; font-size: 1.7rem; letter-spacing: -0.02em; }
+  .tagline { margin: 0 0 14px; color: var(--muted); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button, .btn {
+    font: inherit;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  button:hover, .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .status { min-height: 1.4em; color: var(--muted); font-size: 0.92rem; }
+  .status .ok { color: var(--accent); }
+  .status .err { color: var(--warn); }
+  main { max-width: 1100px; margin: 0 auto; padding: 0 20px 40px; }
+  section { margin-top: 26px; }
+  h2 {
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .nudge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .nudge {
+    background: var(--sell-soft);
+    border: 1px solid #f6d78a;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 0.92rem;
+  }
+  .nudge.overdue { background: #fee2e2; border-color: #fca5a5; }
+  .nudge strong { display: block; }
+  .nudge .meta { color: var(--muted); font-size: 0.85rem; }
+  .month-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+  .month-cell {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 0.88rem;
+  }
+  .month-cell h3 { margin: 0 0 6px; font-size: 0.95rem; }
+  .month-cell .row { margin: 3px 0; }
+  .tag-buy, .tag-sell {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: 1px 7px;
+    margin-right: 4px;
+  }
+  .tag-buy { background: var(--buy-soft); color: var(--accent); }
+  .tag-sell { background: var(--sell-soft); color: var(--sell); }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(36, 50, 63, 0.05);
+  }
+  .card h3 { margin: 0 0 4px; font-size: 1.02rem; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .phase-badge {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 999px;
+    padding: 2px 9px;
+    white-space: nowrap;
+  }
+  .phase-buy { background: var(--buy-soft); color: var(--accent); }
+  .phase-sell { background: var(--sell-soft); color: var(--sell); }
+  .phase-both { background: var(--both-soft); color: var(--both); }
+  .phase-off { background: #eef2f6; color: var(--muted); }
+  .bar { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; margin: 10px 0 4px; }
+  .bar .seg {
+    height: 20px;
+    border-radius: 4px;
+    background: #eef2f6;
+  }
+  .bar .seg span {
+    display: block;
+    text-align: center;
+    font-size: 0.62rem;
+    line-height: 20px;
+    color: #ffffff;
+    font-weight: 700;
+    pointer-events: none;
+  }
+  .seg.buy { background: var(--buy); }
+  .seg.sell { background: var(--sell); }
+  .seg.both { background: var(--both); }
+  .seg.current { outline: 2px solid var(--ink); outline-offset: 1px; }
+  .windows {
+    font-size: 0.85rem;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .windows b { color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+  .chip {
+    font-size: 0.76rem;
+    border-radius: 999px;
+    padding: 2px 9px;
+    border: 1px solid transparent;
+  }
+  .chip.buy-reason { background: var(--buy-soft); border-color: #99e9df; color: #0f5c55; }
+  .chip.sell-reason { background: var(--sell-soft); border-color: #f4d384; color: #8a4b04; }
+  .chip.storage { background: #eef2f6; border-color: var(--line); color: var(--ink); }
+  .chip-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  .prep {
+    font-size: 0.86rem;
+    margin: 10px 0 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #f4f8f8;
+    border: 1px dashed var(--line);
+  }
+  .prep.nudge { background: var(--sell-soft); border-color: #f4d384; }
+  .prep.overdue { background: #fee2e2; border-color: #fca5a5; color: var(--warn); }
+  .profit-label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .profit-row { display: flex; flex-direction: column; gap: 6px; }
+  input, textarea {
+    font: inherit;
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 9px;
+    background: #fcfcfc;
+    color: var(--ink);
+  }
+  textarea { resize: vertical; min-height: 34px; }
+  input:focus, textarea:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  table.sheet { width: 100%; border-collapse: collapse; font-size: 0.9rem; background: var(--surface); }
+  .sheet th, .sheet td {
+    border: 1px solid var(--line);
+    text-align: left;
+    padding: 7px 10px;
+    vertical-align: top;
+  }
+  .sheet th { background: #f0ece4; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  footer {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 10px 20px 30px;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+  .empty { color: var(--muted); font-size: 0.9rem; font-style: italic; }
+  @media print {
+    .toolbar, .status, #monthIndex, #cards, #nudges, footer { display: none !important; }
+    body { background: #ffffff; }
+    input, textarea { border: none; background: none; padding: 0; }
+    section, .card, main { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Resale Season Calendar</h1>
+  <p class="tagline">Buy low, sell high — a month-by-month year plan for resellers. Runs entirely offline; nothing is scraped, uploaded, or synced.</p>
+  <div class="toolbar">
+    <button type="button" id="btnPrint">Print year sheet</button>
+    <label class="btn" for="csvFile">Import results CSV</label>
+    <input type="file" id="csvFile" accept=".csv,text/csv" hidden>
+    <button type="button" id="btnExport">Export results CSV</button>
+    <button type="button" id="btnReset">Clear my data</button>
+  </div>
+  <p id="importStatus" class="status" role="status" aria-live="polite"></p>
+</header>
+<main>
+  <section id="nudges">
+    <h2>Prep-deadline nudges (next 12 weeks)</h2>
+    <div id="nudgeList" class="nudge-grid"></div>
+  </section>
+
+  <section id="monthIndex">
+    <h2>Month by month</h2>
+    <div id="monthGrid" class="month-grid"></div>
+  </section>
+
+  <section id="cards">
+    <h2>Category cards</h2>
+    <div id="cardGrid" class="card-grid"></div>
+  </section>
+
+  <section id="printSheet">
+    <h2>Printable year sheet</h2>
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Buy window</th>
+          <th>Sell window</th>
+          <th>Prep deadline</th>
+          <th>Storage tags</th>
+          <th>Your profit note</th>
+        </tr>
+      </thead>
+      <tbody id="sheetBody"></tbody>
+    </table>
+  </section>
+</main>
+<footer>
+  Resale Season Calendar — offline seasonal planning. This app plans month-level buying and selling windows; for hour-level eBay auction timing, see the separate ebay-auction-timing-webapp.
+  Your profit notes live only in this browser's localStorage. &copy; 2026 Asdale Dynamics, LLC &middot; MIT License.
+</footer>
+
+<script>
+/* APP-SCRIPT-START */
+"use strict";
+
+var MONTHS = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
+var MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+var WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+var CATEGORIES = [
+  {
+    slug: "school-supplies",
+    name: "School Supplies",
+    buy: { start: 7, end: 9 },
+    sell: { start: 7, end: 8 },
+    prepWeeks: 6,
+    reasonsBuy: ["Back-to-school rush clears stock fast", "August clearance hits 50–90% off"],
+    reasonsSell: ["Parents pay a premium right before school starts"],
+    storage: ["Flat bin", "Dry, low heat"]
+  },
+  {
+    slug: "holiday-decor",
+    name: "Holiday Decor",
+    buy: { start: 12, end: 1 },
+    sell: { start: 10, end: 12 },
+    prepWeeks: 5,
+    reasonsBuy: ["Dec 26–Jan clearance is the year's cheapest",
+      "Boxed decor shelves well"],
+    reasonsSell: ["Demand ramps up before Thanksgiving and peaks in December"],
+    storage: ["Attic", "Sturdy boxes", "Fragiles padded"]
+  },
+  {
+    slug: "patio-furniture",
+    name: "Patio & Outdoor",
+    buy: { start: 8, end: 10 },
+    sell: { start: 3, end: 6 },
+    prepWeeks: 6,
+    reasonsBuy: ["End-of-summer floor-model discounts", "Stores stop stocking as fall starts"],
+    reasonsSell: ["Spring restocking demand", "Warm weekends drive impulse buys"],
+    storage: ["Garage", "Shrink-wrap cushions", "Heavy — lift with help"]
+  },
+  {
+    slug: "tax-season-gear",
+    name: "Tax-Season Gear",
+    buy: { start: 5, end: 6 },
+    sell: { start: 1, end: 3 },
+    prepWeeks: 5,
+    reasonsBuy: ["Post-tax-season clearance on forms, software, calculators"],
+    reasonsSell: ["W-2 season: January through April 15"],
+    storage: ["File drawer", "Dry office shelf"]
+  },
+  {
+    slug: "halloween-costumes",
+    name: "Halloween Costumes",
+    buy: { start: 11, end: 11 },
+    sell: { start: 9, end: 10 },
+    prepWeeks: 5,
+    reasonsBuy: ["Nov 1 clearance prices collapse to 70–90% off"],
+    reasonsSell: ["Costume demand peaks the first three weeks of October"],
+    storage: ["Sealed bins", "Moth control", "Keep fabric flat"]
+  },
+  {
+    slug: "fitness-equipment",
+    name: "Fitness Equipment",
+    buy: { start: 6, end: 7 },
+    sell: { start: 12, end: 1 },
+    prepWeeks: 4,
+    reasonsBuy: ["Summer lull means seller discounts", "Gyms dumped equipment deals in mid-year sales"],
+    reasonsSell: ["New Year's resolutions spike January demand"],
+    storage: ["Garage", "Heavy — two-person lift"]
+  },
+  {
+    slug: "valentines-candy",
+    name: "Valentine's Candy & Gifts",
+    buy: { start: 2, end: 3 },
+    sell: { start: 1, end: 2 },
+    prepWeeks: 4,
+    reasonsBuy: ["Day-after clearance on boxed candy", "Non-food gifts (plush, mugs) hold value"],
+    reasonsSell: ["Peak buying window is late January to Feb 14"],
+    storage: ["Cool, dark shelf", "Rotate candy stock"]
+  },
+  {
+    slug: "electronics-tvs",
+    name: "TVs & Electronics",
+    buy: { start: 1, end: 2 },
+    sell: { start: 11, end: 12 },
+    prepWeeks: 4,
+    reasonsBuy: ["Pre-Super Bowl TV price wars", "Black Friday leftovers in January"],
+    reasonsSell: ["Holiday gift demand in November–December"],
+    storage: ["Original boxes", "Low humidity"]
+  },
+  {
+    slug: "winter-gear",
+    name: "Winter Gear",
+    buy: { start: 3, end: 4 },
+    sell: { start: 10, end: 12 },
+    prepWeeks: 6,
+    reasonsBuy: ["End-of-winter clearance on coats, boots, blankets"],
+    reasonsSell: ["First cold snap sends shoppers out early November"],
+    storage: ["Breathable bags", "Moth control", "Attic shelf"]
+  },
+  {
+    slug: "garden-seeds-tools",
+    name: "Garden Seeds & Tools",
+    buy: { start: 6, end: 7 },
+    sell: { start: 2, end: 4 },
+    prepWeeks: 5,
+    reasonsBuy: ["Post-spring clearance on tools, seed, planters"],
+    reasonsSell: ["Seed-starting demand peaks Feb–April"],
+    storage: ["Dry bin", "Keep seed packets cool"]
+  },
+  {
+    slug: "luggage",
+    name: "Luggage & Travel Gear",
+    buy: { start: 9, end: 10 },
+    sell: { start: 5, end: 7 },
+    prepWeeks: 4,
+    reasonsBuy: ["Post-summer clearance on suitcases"],
+    reasonsSell: ["Vacation-planning season: May–July"],
+    storage: ["Nesting suitcases", "Dry closet"]
+  },
+  {
+    slug: "toys",
+    name: "Toys & Board Games",
+    buy: { start: 1, end: 2 },
+    sell: { start: 10, end: 12 },
+    prepWeeks: 8,
+    reasonsBuy: ["Post-holiday toy clearance", "Completeness matters — keep boxes/parts intact"],
+    reasonsSell: ["Gift demand builds from October through December"],
+    storage: ["Original boxes", "Label by theme"]
+  }
+];
+
+function startOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addDays(date, days) {
+  var d = new Date(date.getTime());
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function inWindow(win, month) {
+  if (win.start <= win.end) return month >= win.start && month <= win.end;
+  return month >= win.start || month <= win.end;
+}
+
+function phaseFor(cat, month) {
+  var buy = inWindow(cat.buy, month);
+  var sell = inWindow(cat.sell, month);
+  if (buy && sell) return "both";
+  if (buy) return "buy";
+  if (sell) return "sell";
+  return "off";
+}
+
+function formatWindow(win) {
+  return MONTH_ABBR[win.start - 1] + "\u2013" + MONTH_ABBR[win.end - 1];
+}
+
+function sellStartFor(cat, today) {
+  var t = startOfDay(today);
+  var candidate = new Date(t.getFullYear(), cat.sell.start - 1, 15);
+  if (candidate < t) candidate.setFullYear(candidate.getFullYear() + 1);
+  return candidate;
+}
+
+function prepDeadlineFor(cat, today) {
+  return addDays(sellStartFor(cat, today), -7 * cat.prepWeeks);
+}
+
+function weeksUntil(target, today) {
+  return (target.getTime() - startOfDay(today).getTime()) / WEEK_MS;
+}
+
+function nudgeStatusFor(cat, today) {
+  var t = startOfDay(today);
+  var sellStart = sellStartFor(cat, today);
+  var deadline = prepDeadlineFor(cat, today);
+  var weeksLeft = weeksUntil(deadline, today);
+  var status = {
+    sellStart: sellStart,
+    deadline: deadline,
+    weeksLeft: weeksLeft,
+    nudging: false,
+    overdue: false
+  };
+  if (weeksLeft < 0) {
+    if (sellStart > t) {
+      status.overdue = true;
+    }
+  } else if (weeksLeft <= 12) {
+    status.nudging = true;
+  }
+  return status;
+}
+
+function slugify(value) {
+  return String(value).toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function parseCSV(text) {
+  var rows = [];
+  var row = [];
+  var field = "";
+  var i = 0;
+  var inQuotes = false;
+  var sawContent = false;
+
+  function pushField() {
+    row.push(field);
+    field = "";
+  }
+  function pushRow() {
+    pushField();
+    rows.push(row);
+    row = [];
+  }
+
+  while (i < text.length) {
+    var ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i += 1; continue;
+      }
+      field += ch; i += 1; continue;
+    }
+    if (ch === '"') { inQuotes = true; sawContent = true; i += 1; continue; }
+    if (ch === ",") { pushField(); sawContent = true; i += 1; continue; }
+    if (ch === "\r") { i += 1; continue; }
+    if (ch === "\n") {
+      if (field !== "" || row.length > 0 || sawContent) pushRow();
+      sawContent = false; i += 1; continue;
+    }
+    field += ch; sawContent = true; i += 1;
+  }
+  if (field !== "" || row.length > 0 || sawContent) pushRow();
+  return rows;
+}
+
+function parseResultsCSV(text) {
+  var result = { rows: [], errors: [] };
+  var table = parseCSV(String(text === null || text === undefined ? "" : text));
+  var dataRows = [];
+  var headerIdx = null;
+
+  if (table.length === 0) {
+    result.errors.push("The file is empty.");
+    return result;
+  }
+
+  var first = table[0].map(function (h) { return h.trim().toLowerCase(); });
+  var catIdx = first.indexOf("category");
+  if (catIdx !== -1) {
+    headerIdx = 0;
+  } else {
+    return { rows: [], errors: ["CSV must have a header row with a 'category' column."] };
+  }
+  var profitIdx = first.indexOf("profit");
+  var noteIdx = first.indexOf("note");
+  dataRows = table.slice(1);
+
+  dataRows.forEach(function (cells, n) {
+    var lineNo = n + headerIdx + 2;
+    var catRaw = cells[catIdx] === undefined ? "" : cells[catIdx].trim();
+    if (catRaw === "") return;
+    var slug = slugify(catRaw);
+    if (slug === "") {
+      result.errors.push("Row " + lineNo + ": category '" + catRaw + "' is not usable.");
+      return;
+    }
+    var row = { category: slug };
+    if (profitIdx !== -1) row.profit = (cells[profitIdx] === undefined ? "" : cells[profitIdx].trim());
+    if (noteIdx !== -1) row.note = (cells[noteIdx] === undefined ? "" : cells[noteIdx].trim());
+    if (row.profit && row.note) row.kind = "both";
+    else if (row.profit) row.kind = "profit";
+    else if (row.note) row.kind = "note";
+    else row.kind = "empty";
+    if (row.kind === "empty") {
+      result.errors.push("Row " + lineNo + " (" + catRaw + "): no profit or note value found, skipped.");
+      return;
+    }
+    result.rows.push(row);
+  });
+  return result;
+}
+
+var NOTES_KEY = "rsc.notes.v1";
+var IMPORT_KEY = "rsc.importedAt.v1";
+
+/* ---- browser-only section ---- */
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function loadNotes() {
+  try {
+    var raw = window.localStorage.getItem(NOTES_KEY);
+    var data = raw ? JSON.parse(raw) : {};
+    return data && typeof data === "object" ? data : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function saveNotes(notes) {
+  window.localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+}
+
+function formatDate(date) {
+  return MONTH_ABBR[date.getMonth()] + " " + date.getDate() + ", " + date.getFullYear();
+}
+
+function phaseBadge(phase) {
+  var map = {
+    buy: ["phase-buy", "Buying now"],
+    sell: ["phase-sell", "Selling now"],
+    both: ["phase-both", "Buying & selling"],
+    off: ["phase-off", "Off-season"]
+  };
+  var info = map[phase];
+  return '<span class="phase-badge ' + info[0] + '">' + info[1] + "</span>";
+}
+
+function renderBars() {
+  var notes = loadNotes();
+
+  /* nudges */
+  var today = new Date();
+  var nudgeList = document.getElementById("nudgeList");
+  var nudgeItems = [];
+  CATEGORIES.forEach(function (cat) {
+    var status = nudgeStatusFor(cat, today);
+    if (status.nudging) {
+      nudgeItems.push('<div class="nudge"><strong>' + escapeHtml(cat.name) +
+        "</strong>Prep deadline: " + formatDate(status.deadline) +
+        ' <span class="meta">(' + Math.ceil(status.weeksLeft) + " wk left)</span></div>");
+    } else if (status.overdue) {
+      nudgeItems.push('<div class="nudge overdue"><strong>' + escapeHtml(cat.name) +
+        "</strong>Prep overdue — sell window starts " +
+        formatDate(status.sellStart) + "</div>");
+    }
+  });
+  nudgeList.innerHTML = nudgeItems.length
+    ? nudgeItems.join("")
+    : '<p class="empty">No prep deadlines in the next twelve weeks. Breathe easy.</p>';
+
+  /* month index */
+  var monthGrid = document.getElementById("monthGrid");
+  var cells = [];
+  for (var m = 1; m <= 12; m++) {
+    var buyNames = [];
+    var sellNames = [];
+    CATEGORIES.forEach(function (cat) {
+      if (inWindow(cat.buy, m)) buyNames.push(escapeHtml(cat.name));
+      if (inWindow(cat.sell, m)) sellNames.push(escapeHtml(cat.name));
+    });
+    cells.push('<div class="month-cell"><h3>' + MONTHS[m - 1] + "</h3>" +
+      '<div class="row"><span class="tag-buy">Buy</span>' +
+      (buyNames.length ? buyNames.join(", ") : "—") + "</div>" +
+      '<div class="row"><span class="tag-sell">Sell</span>' +
+      (sellNames.length ? sellNames.join(", ") : "—") + "</div></div>");
+  }
+  monthGrid.innerHTML = cells.join("");
+
+  /* category cards */
+  var cardGrid = document.getElementById("cardGrid");
+  var cards = CATEGORIES.map(function (cat) {
+    var month = today.getMonth() + 1;
+    var phase = phaseFor(cat, month);
+    var status = nudgeStatusFor(cat, today);
+    var segs = MONTH_ABBR.map(function (abbr, idx) {
+      var m2 = idx + 1;
+      var segPhase = phaseFor(cat, m2);
+      var cls = "seg " +
+        (segPhase === "buy" ? "buy" : segPhase === "sell" ? "sell" : segPhase === "both" ? "both" : "") +
+        (m2 === month ? " current" : "");
+      var label = m2 === month ? "current month" :
+        segPhase === "buy" ? "buy month" : segPhase === "sell" ? "sell month" :
+        segPhase === "both" ? "buy + sell month" : "off-season";
+      return '<div class="' + cls + '" title="' + MONTHS[idx] + " \u2014 " + label +
+        '">' + (segPhase === "off" ? "" : "<span>" + abbr[0] + "</span>") + "</div>";
+    }).join("");
+    var note = (notes[cat.slug] || {});
+    var prepClass = status.overdue ? "overdue" : status.nudging ? "nudge" : "";
+    var prepText = status.overdue
+      ? "<strong>Prep overdue</strong> — sell window starts " + formatDate(status.sellStart)
+      : "<strong>Prep deadline:</strong> " + formatDate(status.deadline) +
+        " <span class=\"meta\">(" + cat.prepWeeks + " wk before " +
+        MONTH_ABBR[status.sellStart.getMonth()] + " " + status.sellStart.getDate() + ")" +
+        (status.nudging ? " — nudge active" : "") + "</span>";
+    return '<article class="card" data-slug="' + cat.slug + '">' +
+      "<h3>" + escapeHtml(cat.name) + phaseBadge(phase) + "</h3>" +
+      '<div class="bar">' + segs + "</div>" +
+      '<div class="windows"><span>Buy: <b>' + formatWindow(cat.buy) + "</b></span>" +
+      "<span>Sell: <b>" + formatWindow(cat.sell) + "</b></span></div>" +
+      '<div class="chip-label">Why buy</div><div class="chips">' +
+      cat.reasonsBuy.map(function (r) { return '<span class="chip buy-reason">' + escapeHtml(r) + "</span>"; }).join("") +
+      "</div>" +
+      '<div class="chip-label">Why sell</div><div class="chips">' +
+      cat.reasonsSell.map(function (r) { return '<span class="chip sell-reason">' + escapeHtml(r) + "</span>"; }).join("") +
+      "</div>" +
+      '<div class="chip-label">Storage tags</div><div class="chips">' +
+      cat.storage.map(function (s) { return '<span class="chip storage">' + escapeHtml(s) + "</span>"; }).join("") +
+      "</div>" +
+      '<div class="prep ' + prepClass + '">' + prepText + "</div>" +
+      '<div class="profit-row"><label class="profit-label" for="profit-' + cat.slug +
+      '">Profit note (yours)</label>' +
+      '<input id="profit-' + cat.slug + '" data-note="profit" data-slug="' + cat.slug +
+      '" value="' + escapeHtml(note.profit || "") + '" placeholder="e.g. $340 net last season">' +
+      '<textarea id="notepar-' + cat.slug + '" data-note="note" data-slug="' + cat.slug +
+      '" placeholder="Lessons, sources, quantity, condition…">' + escapeHtml(note.note || "") + "</textarea>" +
+      "</div></article>";
+  });
+  cardGrid.innerHTML = cards.join("");
+
+  renderPrintSheet(notes);
+}
+
+function renderPrintSheet(notes) {
+  var today = new Date();
+  var tbody = document.getElementById("sheetBody");
+  var rows = CATEGORIES.map(function (cat) {
+    var status = nudgeStatusFor(cat, today);
+    var note = (notes || loadNotes())[cat.slug] || {};
+    var visible = [];
+    if (note.profit) visible.push(escapeHtml(note.profit));
+    if (note.note) visible.push(escapeHtml(note.note));
+    var cell = visible.length ? visible.join(" — ") : "<em>&nbsp;</em>";
+    return "<tr><td>" + escapeHtml(cat.name) + "</td>" +
+      "<td>" + formatWindow(cat.buy) + "</td>" +
+      "<td>" + formatWindow(cat.sell) + "</td>" +
+      "<td>" + formatDate(status.deadline) + " (" + cat.prepWeeks + " wk)</td>" +
+      "<td>" + cat.storage.map(escapeHtml).join(" &middot; ") + "</td>" +
+      '<td class="note-cell">' + cell + "</td></tr>";
+  });
+  tbody.innerHTML = rows.join("");
+}
+
+function updateSheetFor(slug) {
+  renderPrintSheet(loadNotes());
+}
+
+if (typeof document !== "undefined") {
+  window.addEventListener("DOMContentLoaded", function () {
+    renderBars();
+
+    document.getElementById("cardGrid").addEventListener("input", function (evt) {
+      var target = evt.target;
+      var slug = target.getAttribute("data-slug");
+      var kind = target.getAttribute("data-note");
+      if (!slug || !kind) return;
+      var notes = loadNotes();
+      if (!notes[slug]) notes[slug] = {};
+      notes[slug][kind] = target.value;
+      saveNotes(notes);
+      updateSheetFor(slug);
+    });
+
+    document.getElementById("btnPrint").addEventListener("click", function () {
+      window.print();
+    });
+
+    document.getElementById("btnExport").addEventListener("click", function () {
+      var lines = ["category,profit,note"];
+      var notes = loadNotes();
+      CATEGORIES.forEach(function (cat) {
+        var note = notes[cat.slug] || {};
+        var profit = (note.profit || "").replace(/"/g, '""');
+        var text = (note.note || "").replace(/"/g, '""');
+        lines.push('"' + cat.name + '","' + profit + '","' + text + '"');
+      });
+      var blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/csv" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "resale-season-results.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    document.getElementById("csvFile").addEventListener("change", function (evt) {
+      var file = evt.target.files && evt.target.files[0];
+      evt.target.value = "";
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        try {
+          var parsed = parseResultsCSV(String(reader.result || ""));
+          var notes = loadNotes();
+          parsed.rows.forEach(function (row) {
+            if (!notes[row.category]) notes[row.category] = {};
+            if (row.kind === "profit" || row.kind === "both") notes[row.category].profit = row.profit;
+            if (row.kind === "note" || row.kind === "both") notes[row.category].note = row.note;
+          });
+          saveNotes(notes);
+          window.localStorage.setItem(IMPORT_KEY, new Date().toISOString());
+          renderBars();
+          var msg = "Imported " + parsed.rows.length + " row" + (parsed.rows.length === 1 ? "" : "s") + ".";
+          if (parsed.errors.length) msg += " " + parsed.errors.length + " skipped.";
+          document.getElementById("importStatus").innerHTML =
+            '<span class="' + (parsed.errors.length ? "err" : "ok") + '">' + escapeHtml(msg) + "</span> " +
+            parsed.errors.slice(0, 3).map(escapeHtml).join(" ");
+          if (parsed.errors.length > 3) {
+            var extra = document.createElement("span");
+            extra.textContent = " …and " + (parsed.errors.length - 3) + " more.";
+            document.getElementById("importStatus").appendChild(extra);
+          }
+        } catch (err) {
+          document.getElementById("importStatus").innerHTML =
+            '<span class="err">Import failed: ' + escapeHtml(err && err.message || String(err)) + "</span>";
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    document.getElementById("btnReset").addEventListener("click", function () {
+      if (!window.confirm("Clear your profit notes and import history? This cannot be undone.")) return;
+      window.localStorage.removeItem(NOTES_KEY);
+      window.localStorage.removeItem(IMPORT_KEY);
+      document.getElementById("importStatus").textContent = "Cleared your saved data.";
+      renderBars();
+    });
+  });
+}
+
+if (typeof module !== "undefined" && module && module.exports) {
+  module.exports = {
+    MONTHS: MONTHS,
+    MONTH_ABBR: MONTH_ABBR,
+    CATEGORIES: CATEGORIES,
+    startOfDay: startOfDay,
+    addDays: addDays,
+    inWindow: inWindow,
+    phaseFor: phaseFor,
+    formatWindow: formatWindow,
+    sellStartFor: sellStartFor,
+    prepDeadlineFor: prepDeadlineFor,
+    weeksUntil: weeksUntil,
+    nudgeStatusFor: nudgeStatusFor,
+    slugify: slugify,
+    parseCSV: parseCSV,
+    parseResultsCSV: parseResultsCSV
+  };
+}
+/* APP-SCRIPT-END */
+</script>
+</body>
+</html>
